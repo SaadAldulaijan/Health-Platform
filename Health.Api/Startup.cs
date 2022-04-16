@@ -1,7 +1,10 @@
+using Health.Data.Database;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -26,11 +29,19 @@ namespace Health.Api
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-
+            AddIdentity(services);
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "Health.Api", Version = "v1" });
+            });
+
+            services.AddCors(options =>
+            {
+                options.AddPolicy("cors", policy =>
+                {
+                    policy.AllowAnyHeader().AllowAnyOrigin().AllowAnyMethod();
+                });
             });
         }
 
@@ -46,6 +57,8 @@ namespace Health.Api
 
             app.UseHttpsRedirection();
 
+            app.UseCors("cors");
+
             app.UseRouting();
 
             app.UseAuthorization();
@@ -53,6 +66,36 @@ namespace Health.Api
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
+            });
+        }
+
+        public void AddIdentity(IServiceCollection services)
+        {
+            services.AddDbContext<DataContext>(opt =>
+            {
+                opt.UseInMemoryDatabase("Dev");
+            });
+
+            services.AddIdentity<IdentityUser, IdentityRole>(options =>
+            {
+                options.User.RequireUniqueEmail = true;
+                options.Password.RequireDigit = false;
+                options.Password.RequiredLength = 4;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+            })
+                .AddEntityFrameworkStores<DataContext>()
+                .AddDefaultTokenProviders();
+
+
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("admin", policy =>
+                {
+                    policy.RequireAuthenticatedUser()
+                    .RequireClaim("Role", "admin");
+                });
             });
         }
     }
